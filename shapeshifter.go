@@ -54,14 +54,18 @@ func (ss ShapeShifter) clientHandler(conn net.Conn) {
 	defer conn.Close()
 
 	transport := obfs4.NewObfs4Client(ss.Cert, ss.IatMode)
-	remote := transport.Dial(ss.Target)
+	remote, err := transport.Dial(ss.Target)
+	if err != nil {
+		log.Printf("outgoing connection failed %s: %v", ss.Target, err)
+		return
+	}
 	if remote == nil {
 		log.Printf("outgoing connection failed %s", ss.Target)
 		return
 	}
 	defer remote.Close()
 
-	err := copyLoop(conn, remote)
+	err = copyLoop(conn, remote)
 	if err != nil {
 		log.Printf("%s - closed connection: %v", ss.Target, err)
 	} else {
