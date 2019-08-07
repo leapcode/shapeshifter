@@ -34,7 +34,10 @@ func (ss *ShapeShifter) Open() error {
 }
 
 func (ss *ShapeShifter) Close() error {
-	return ss.ln.Close()
+	if ss.ln != nil {
+		return ss.ln.Close()
+	}
+	return nil
 }
 
 func (ss ShapeShifter) clientAcceptLoop() error {
