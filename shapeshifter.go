@@ -16,6 +16,7 @@ type ShapeShifter struct {
 	Target    string // remote ip:port obfs4 server
 	SocksAddr string // -proxylistenaddr in shapeshifter-dispatcher
 	ln        net.Listener
+	errChan   chan error
 }
 
 func (ss *ShapeShifter) Open() error {
@@ -40,6 +41,20 @@ func (ss *ShapeShifter) Close() error {
 	return nil
 }
 
+func (ss *ShapeShifter) GetErrorChannel() chan error {
+	if ss.errChan == nil {
+		ss.errChan = make(chan error, 2)
+	}
+	return ss.errChan
+}
+
+func (ss *ShapeShifter) GetLastError() error {
+	if ss.errChan == nil {
+		ss.errChan = make(chan error, 2)
+	}
+	return <-ss.errChan
+}
+
 func (ss ShapeShifter) clientAcceptLoop() error {
 	for {
 		conn, err := ss.ln.Accept()
@@ -47,6 +62,7 @@ func (ss ShapeShifter) clientAcceptLoop() error {
 			if e, ok := err.(net.Error); ok && !e.Temporary() {
 				return err
 			}
+			ss.sendError("Error accepting connection: %v", err)
 			continue
 		}
 		go ss.clientHandler(conn)
@@ -59,18 +75,18 @@ func (ss ShapeShifter) clientHandler(conn net.Conn) {
 	transport := obfs4.NewObfs4Client(ss.Cert, ss.IatMode)
 	remote, err := transport.Dial(ss.Target)
 	if err != nil {
-		log.Printf("outgoing connection failed %s: %v", ss.Target, err)
+		ss.sendError("outgoing connection failed %s: %v", ss.Target, err)
 		return
 	}
 	if remote == nil {
-		log.Printf("outgoing connection failed %s", ss.Target)
+		ss.sendError("outgoing connection failed %s", ss.Target)
 		return
 	}
 	defer remote.Close()
 
 	err = copyLoop(conn, remote)
 	if err != nil {
-		log.Printf("%s - closed connection: %v", ss.Target, err)
+		ss.sendError("%s - closed connection: %v", ss.Target, err)
 	} else {
 		log.Printf("%s - closed connection", ss.Target)
 	}
@@ -120,4 +136,15 @@ func (ss *ShapeShifter) checkOptions() error {
 		return fmt.Errorf("obfs4 transport missing cert argument")
 	}
 	return nil
+}
+
+func (ss *ShapeShifter) sendError(format string, a ...interface{}) {
+	if ss.errChan == nil {
+		ss.errChan = make(chan error, 2)
+	}
+	select {
+	case ss.errChan <- fmt.Errorf(format, a...):
+	default:
+		log.Printf(format, a...)
+	}
 }
