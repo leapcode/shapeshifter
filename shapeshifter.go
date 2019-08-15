@@ -38,6 +38,9 @@ func (ss *ShapeShifter) Close() error {
 	if ss.ln != nil {
 		return ss.ln.Close()
 	}
+	if ss.errChan != nil {
+		close(ss.errChan)
+	}
 	return nil
 }
 
