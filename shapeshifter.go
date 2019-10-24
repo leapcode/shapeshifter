@@ -10,6 +10,7 @@ import (
 
 	"github.com/OperatorFoundation/obfs4/common/ntor"
 	"github.com/OperatorFoundation/shapeshifter-transports/transports/obfs4"
+	"golang.org/x/net/proxy"
 )
 
 type ShapeShifter struct {
@@ -77,9 +78,10 @@ func (ss ShapeShifter) clientAcceptLoop() error {
 func (ss ShapeShifter) clientHandler(conn net.Conn) {
 	defer conn.Close()
 
-	transport := obfs4.NewObfs4Client(ss.Cert, ss.IatMode)
-	if transport == nil {
-		ss.sendError("Can not create an obfs4 client (cert: %s, iat-mode: %d)", ss.Cert, ss.IatMode)
+	dialer := proxy.Direct
+	transport, err := obfs4.NewObfs4Client(ss.Cert, ss.IatMode, dialer)
+	if err != nil {
+		ss.sendError("Can not create an obfs4 client (cert: %s, iat-mode: %d): %v", ss.Cert, ss.IatMode, err)
 		return
 	}
 	remote, err := transport.Dial(ss.Target)
