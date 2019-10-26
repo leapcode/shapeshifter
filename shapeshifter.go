@@ -13,11 +13,16 @@ import (
 	"golang.org/x/net/proxy"
 )
 
+type Logger interface {
+	Log(msg string)
+}
+
 type ShapeShifter struct {
 	Cert      string
 	IatMode   int
 	Target    string // remote ip:port obfs4 server
 	SocksAddr string // -proxylistenaddr in shapeshifter-dispatcher
+	Logger    Logger
 	ln        net.Listener
 	errChan   chan error
 }
@@ -52,13 +57,6 @@ func (ss *ShapeShifter) GetErrorChannel() chan error {
 		ss.errChan = make(chan error, 2)
 	}
 	return ss.errChan
-}
-
-func (ss *ShapeShifter) GetLastError() error {
-	if ss.errChan == nil {
-		ss.errChan = make(chan error, 2)
-	}
-	return <-ss.errChan
 }
 
 func (ss ShapeShifter) clientAcceptLoop() error {
@@ -147,6 +145,11 @@ func (ss *ShapeShifter) checkOptions() error {
 }
 
 func (ss *ShapeShifter) sendError(format string, a ...interface{}) {
+	if ss.Logger != nil {
+		ss.Logger.Log(fmt.Sprintf(format, a...))
+		return
+	}
+
 	if ss.errChan == nil {
 		ss.errChan = make(chan error, 2)
 	}
