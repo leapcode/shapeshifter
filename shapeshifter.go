@@ -43,13 +43,14 @@ func (ss *ShapeShifter) Open() error {
 }
 
 func (ss *ShapeShifter) Close() error {
+	var err error
 	if ss.ln != nil {
-		return ss.ln.Close()
+		err = ss.ln.Close()
 	}
 	if ss.errChan != nil {
 		close(ss.errChan)
 	}
-	return nil
+	return err
 }
 
 func (ss *ShapeShifter) GetErrorChannel() chan error {
