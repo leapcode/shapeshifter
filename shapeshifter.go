@@ -1,4 +1,4 @@
-package shapeshifter
+package shapeshifter // import "0xacab.org/leap/shapeshifter"
 
 import (
 	"encoding/base64"
