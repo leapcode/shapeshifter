@@ -3,15 +3,15 @@ module 0xacab.org/leap/shapeshifter
 go 1.17
 
 require (
-	github.com/OperatorFoundation/obfs4 v1.0.0
-	github.com/OperatorFoundation/shapeshifter-transports/transports/obfs4/v2 v2.2.8
+	git.torproject.org/pluggable-transports/goptlib.git v1.1.0
+	gitlab.com/yawning/obfs4.git v0.0.0-20220204003609-77af0cba934d
 	golang.org/x/net v0.0.0-20220225172249-27dd8689420f
 )
 
 require (
-	github.com/OperatorFoundation/ed25519 v0.0.0-20200225224545-b22b4bd3ddef // indirect
-	github.com/OperatorFoundation/shapeshifter-ipc/v2 v2.0.0 // indirect
+	filippo.io/edwards25519 v1.0.0-rc.1.0.20210721174708-390f27c3be20 // indirect
 	github.com/dchest/siphash v1.2.1 // indirect
-	golang.org/x/crypto v0.0.0-20200221231518-2aa609cf4a9d // indirect
+	gitlab.com/yawning/edwards25519-extra.git v0.0.0-20211229043746-2f91fcc9fbdb // indirect
+	golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97 // indirect
 	golang.org/x/sys v0.0.0-20211216021012-1d35b9e2eb4e // indirect
 )

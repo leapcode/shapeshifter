@@ -6,12 +6,32 @@ import (
 	"io"
 	"log"
 	"net"
+	"strconv"
 	"sync"
 
-	"github.com/OperatorFoundation/obfs4/common/ntor"
-	"github.com/OperatorFoundation/shapeshifter-transports/transports/obfs4/v2"
+	pt "git.torproject.org/pluggable-transports/goptlib.git"
+	"gitlab.com/yawning/obfs4.git/common/ntor"
+	"gitlab.com/yawning/obfs4.git/transports/obfs4"
 	"golang.org/x/net/proxy"
 )
+
+const (
+	certLength = ntor.NodeIDLength + ntor.PublicKeyLength
+)
+
+func unpackCert(cert string) (*ntor.NodeID, *ntor.PublicKey, error) {
+	if l := base64.RawStdEncoding.DecodedLen(len(cert)); l != certLength {
+		return nil, nil, fmt.Errorf("cert length %d is invalid", l)
+	}
+	decoded, err := base64.RawStdEncoding.DecodeString(cert)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	nodeID, _ := ntor.NewNodeID(decoded[:ntor.NodeIDLength])
+	pubKey, _ := ntor.NewPublicKey(decoded[ntor.NodeIDLength:])
+	return nodeID, pubKey, nil
+}
 
 type Logger interface {
 	Log(msg string)
@@ -78,12 +98,31 @@ func (ss ShapeShifter) clientHandler(conn net.Conn) {
 	defer conn.Close()
 
 	dialer := proxy.Direct
-	transport, err := obfs4.NewObfs4Client(ss.Cert, ss.IatMode, dialer)
+	// The empty string is the StateDir argument which appears unused on the
+	// client side. I am unsure why the clientfactory requires it; possibly to
+	// satisfy an interface somewhere, but this is not documented.
+	//transport, err := obfs4.NewObfs4Client(ss.Cert, ss.IatMode, dialer)
+
+	transport, err := (&obfs4.Transport{}).ClientFactory("")
 	if err != nil {
 		ss.sendError("Can not create an obfs4 client (cert: %s, iat-mode: %d): %v", ss.Cert, ss.IatMode, err)
 		return
 	}
-	remote, err := transport.Dial(ss.Target)
+	ptArgs := make(pt.Args)
+	nodeID, pubKey, err := unpackCert(ss.Cert)
+	if err != nil {
+		ss.sendError("Error unpacking cert: %v", err)
+		return
+	}
+	ptArgs.Add("node-id", nodeID.Hex())
+	ptArgs.Add("public-key", pubKey.Hex())
+	ptArgs.Add("iat-mode", strconv.Itoa(ss.IatMode))
+	args, err := transport.ParseArgs(&ptArgs)
+	if err != nil {
+		ss.sendError("Cannot parse arguments: %v", err)
+		return
+	}
+	remote, err := transport.Dial("tcp", ss.Target, dialer.Dial, args)
 	if err != nil {
 		ss.sendError("outgoing connection failed %s: %v", ss.Target, err)
 		return
@@ -142,7 +181,8 @@ func (ss *ShapeShifter) checkOptions() error {
 	if ss.SocksAddr == "" {
 		ss.SocksAddr = "127.0.0.1:0"
 	}
-	return isCertValid(ss.Cert)
+	_, _, err := unpackCert(ss.Cert)
+	return err
 }
 
 func (ss *ShapeShifter) sendError(format string, a ...interface{}) {
@@ -159,25 +199,4 @@ func (ss *ShapeShifter) sendError(format string, a ...interface{}) {
 	default:
 		log.Printf(format, a...)
 	}
-}
-
-func isCertValid(cert string) error {
-	// copied from github.com/OperatorFoundation/shapeshifter-transports/transports/obfs4/statefile.go
-	const certSuffix = "=="
-	const certLength = ntor.NodeIDLength + ntor.PublicKeyLength
-
-	if cert == "" {
-		return fmt.Errorf("obfs4 transport missing cert argument")
-	}
-
-	decoded, err := base64.StdEncoding.DecodeString(cert + certSuffix)
-	if err != nil {
-		return fmt.Errorf("failed to decode cert: %s", err)
-	}
-
-	if len(decoded) != certLength {
-		return fmt.Errorf("cert length %d is invalid", len(decoded))
-	}
-
-	return nil
 }
